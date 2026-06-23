@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>2026 世界盃預測分析系統</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI','Microsoft JhengHei',sans-serif;background:#0F172A;color:#E2E8F0;min-height:100vh}
+.header{background:#1E3A5F;padding:16px 24px;text-align:center}
+.header h1{font-size:22px;color:white}.header p{font-size:12px;color:#94A3B8;margin-top:4px}
+.container{display:flex;max-width:1200px;margin:0 auto;padding:16px;gap:16px;height:calc(100vh - 90px)}
+.left{width:320px;flex-shrink:0;display:flex;flex-direction:column;gap:12px}
+.right{flex:1;background:#1E293B;border-radius:12px;overflow-y:auto;padding:16px}
+.card{background:#1E293B;border-radius:10px;padding:14px;border:1px solid #334155}
+.card h3{font-size:13px;margin-bottom:8px;color:#E2E8F0}
+select,button,input{width:100%;padding:10px 12px;border-radius:8px;border:1px solid #334155;background:#0F172A;color:#E2E8F0;font-size:13px;cursor:pointer;margin:4px 0}
+select:focus{outline:2px solid #3B82F6}
+button.primary{background:#3B82F6;border:none;color:white;font-weight:bold;font-size:14px;padding:12px;margin-top:8px;transition:.2s}
+button.primary:hover{background:#2563EB}
+.match-btn{text-align:left;background:transparent;border:1px solid #334155;margin:2px 0;padding:8px 10px;font-size:12px;border-radius:6px;transition:.2s}
+.match-btn:hover{background:#334155}.match-btn.sel{background:#1E3A5F;border-color:#3B82F6}
+.match-btn.done{color:#64748B}.match-btn.today{color:#10B981;border-color:#10B981}
+.match-list{max-height:200px;overflow-y:auto}
+.sim-options{display:flex;gap:8px}.sim-options label{flex:1;text-align:center;padding:6px;border:1px solid #334155;border-radius:6px;cursor:pointer;font-size:12px}
+.sim-options input{display:none}.sim-options input:checked+label{background:#1E3A5F;border-color:#3B82F6}
+.bar-row{display:flex;align-items:center;margin:6px 0;gap:8px}
+.bar-row span{width:60px;font-size:12px;text-align:right;flex-shrink:0}
+.bar-row .bar{flex:1;height:18px;background:#334155;border-radius:4px;overflow:hidden}
+.bar-row .bar div{height:100%;border-radius:4px;transition:width .5s}
+.bar-row .pct{width:45px;font-size:12px;font-weight:bold;text-align:left}
+.section{margin:10px 0;padding:10px;background:#0F172A;border-radius:8px}
+.section h4{font-size:12px;margin-bottom:4px}
+.section p{font-size:11px;color:#94A3B8;white-space:pre-line;line-height:1.6}
+.rec{color:#F59E0B;border-color:#F59E0B!important}
+.warn{font-size:10px;color:#64748B;text-align:center;margin-top:12px}
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>🏆 2026 FIFA 世界盃 預測分析系統</h1>
+  <p>蒙地卡羅模擬 × Poisson 分布 × 48隊完整資料 × 八大因素整合</p>
+</div>
+<div class="container">
+  <div class="left">
+    <div class="card"><h3>📅 比賽日期</h3><select id="dateSelect" onchange="loadMatches()"></select></div>
+    <div class="card"><h3>⚽ 對戰組合</h3><div class="match-list" id="matchList"></div></div>
+    <div class="card"><h3>🎯 運彩玩法</h3><select id="betType"></select></div>
+    <div class="card"><h3>🔄 模擬次數</h3>
+      <div class="sim-options" id="simOpts"></div>
+    </div>
+    <button class="primary" onclick="runSim()">🚀 開始分析預測</button>
+    <div class="warn">⚠️ 僅供參考，運彩有風險請理性決策</div>
+  </div>
+  <div class="right" id="result"><div style="text-align:center;padding:80px 20px;color:#64748B"><div style="font-size:48px">🏟️</div><p style="margin-top:12px">選擇日期 → 選擇對戰 → 開始分析</p></div></div>
+</div>
+
+<script>
+// ===== 48隊資料 (壓縮版) =====
+const TEAMS={
+"阿根廷":{g:"J",r:1,a:94,d:85,m:90,e:2135,f:3.0},"法國":{g:"I",r:2,a:92,d:88,m:89,e:2120,f:2.3},
+"巴西":{g:"C",r:3,a:93,d:86,m:88,e:2110,f:1.8},"英格蘭":{g:"L",r:4,a:90,d:84,m:87,e:2085,f:2.5},
+"西班牙":{g:"H",r:5,a:86,d:85,m:90,e:2070,f:2.0},"德國":{g:"E",r:6,a:87,d:83,m:86,e:2050,f:3.0},
+"葡萄牙":{g:"K",r:7,a:88,d:82,m:84,e:2040,f:1.5},"荷蘭":{g:"F",r:8,a:84,d:85,m:82,e:2020,f:2.5},
+"比利時":{g:"G",r:9,a:83,d:79,m:82,e:1990,f:-0.5},"克羅埃西亞":{g:"L",r:10,a:78,d:80,m:82,e:1970,f:0.0},
+"美國":{g:"D",r:11,a:81,d:80,m:83,e:1960,f:3.5},"墨西哥":{g:"A",r:12,a:79,d:77,m:78,e:1920,f:1.5},
+"摩洛哥":{g:"C",r:13,a:77,d:82,m:76,e:1940,f:1.0},"日本":{g:"F",r:14,a:80,d:79,m:82,e:1930,f:0.5},
+"塞內加爾":{g:"I",r:15,a:78,d:76,m:75,e:1900,f:-1.0},"瑞士":{g:"B",r:16,a:75,d:80,m:76,e:1910,f:1.0},
+"烏拉圭":{g:"H",r:17,a:80,d:78,m:77,e:1935,f:1.5},"哥倫比亞":{g:"K",r:18,a:80,d:77,m:78,e:1925,f:1.0},
+"南韓":{g:"A",r:19,a:79,d:76,m:75,e:1880,f:-1.0},"象牙海岸":{g:"E",r:20,a:77,d:75,m:74,e:1850,f:-1.0},
+"瑞典":{g:"F",r:21,a:77,d:76,m:75,e:1870,f:-0.5},"奧地利":{g:"J",r:22,a:75,d:76,m:77,e:1860,f:0.5},
+"丹麥":{g:"E",r:23,a:74,d:76,m:75,e:1845,f:0.0},"澳洲":{g:"D",r:24,a:72,d:74,m:72,e:1780,f:-1.0},
+"埃及":{g:"G",r:25,a:78,d:72,m:73,e:1830,f:0.5},"波蘭":{g:"I",r:26,a:77,d:73,m:74,e:1820,f:-1.0},
+"挪威":{g:"I",r:27,a:82,d:73,m:75,e:1855,f:2.3},"伊朗":{g:"G",r:28,a:73,d:76,m:72,e:1810,f:-0.5},
+"捷克":{g:"A",r:29,a:74,d:74,m:75,e:1830,f:-0.5},"土耳其":{g:"D",r:30,a:76,d:73,m:74,e:1835,f:-2.0},
+"沙烏地阿拉伯":{g:"H",r:31,a:72,d:72,m:70,e:1740,f:-1.0},"阿爾及利亞":{g:"J",r:32,a:74,d:73,m:73,e:1800,f:-1.0},
+"巴拉圭":{g:"D",r:33,a:72,d:75,m:72,e:1790,f:-1.0},"迦納":{g:"L",r:34,a:74,d:72,m:73,e:1770,f:-1.5},
+"南非":{g:"A",r:35,a:72,d:73,m:71,e:1750,f:-2.5},"蘇格蘭":{g:"C",r:36,a:71,d:73,m:74,e:1815,f:-3.0},
+"卡達":{g:"B",r:37,a:72,d:71,m:72,e:1730,f:-3.0},"伊拉克":{g:"I",r:38,a:70,d:70,m:70,e:1710,f:-5.0},
+"突尼西亞":{g:"F",r:40,a:69,d:71,m:69,e:1755,f:-5.0},"加拿大":{g:"B",r:30,a:80,d:75,m:79,e:1840,f:2.0},
+"厄瓜多":{g:"E",r:24,a:76,d:77,m:76,e:1830,f:-1.0},"剛果民主共和國":{g:"K",r:50,a:72,d:68,m:71,e:1700,f:-3.0},
+"庫拉索":{g:"E",r:48,a:62,d:63,m:61,e:1580,f:-3.7},"波赫":{g:"B",r:49,a:70,d:69,m:70,e:1720,f:-4.0},
+"海地":{g:"C",r:46,a:65,d:64,m:64,e:1620,f:-5.0},"紐西蘭":{g:"G",r:45,a:65,d:66,m:64,e:1640,f:-3.0},
+"維德角":{g:"H",r:44,a:67,d:68,m:66,e:1660,f:-2.5},"巴拿馬":{g:"L",r:42,a:67,d:69,m:67,e:1680,f:-4.0},
+"烏茲別克":{g:"K",r:43,a:68,d:67,m:68,e:1690,f:-5.0},"約旦":{g:"J",r:47,a:64,d:65,m:64,e:1650,f:-4.0}
+};
+
+// ===== 賽程 =====
+const MATCHES=[
+["2026-06-11","A","墨西哥","南非","2-0"],["2026-06-11","A","南韓","捷克","2-1"],
+["2026-06-12","B","加拿大","波赫","1-1"],["2026-06-12","D","美國","巴拉圭","4-1"],
+["2026-06-13","B","卡達","瑞士","1-1"],["2026-06-13","C","巴西","摩洛哥","1-1"],["2026-06-13","C","蘇格蘭","海地","1-0"],
+["2026-06-14","D","澳洲","土耳其","2-0"],["2026-06-14","E","德國","庫拉索","7-1"],["2026-06-14","F","荷蘭","日本","2-2"],
+["2026-06-14","E","象牙海岸","厄瓜多","1-0"],["2026-06-14","F","瑞典","突尼西亞","5-1"],
+["2026-06-15","H","西班牙","維德角","0-0"],["2026-06-15","G","比利時","埃及","1-1"],["2026-06-15","H","沙烏地阿拉伯","烏拉圭","1-1"],
+["2026-06-15","G","伊朗","紐西蘭","2-2"],["2026-06-16","I","法國","塞內加爾","3-1"],["2026-06-16","I","挪威","伊拉克","4-1"],
+["2026-06-16","J","阿根廷","阿爾及利亞","3-0"],["2026-06-17","J","奧地利","約旦","3-1"],
+["2026-06-17","K","葡萄牙","剛果民主共和國","1-1"],["2026-06-17","L","英格蘭","克羅埃西亞","4-2"],
+["2026-06-17","L","迦納","巴拿馬","1-0"],["2026-06-17","K","哥倫比亞","烏茲別克","3-1"],
+["2026-06-18","A","捷克","南非","1-1"],["2026-06-18","B","瑞士","波赫","4-1"],["2026-06-18","B","加拿大","卡達","6-0"],
+["2026-06-18","A","墨西哥","南韓","1-0"],["2026-06-19","D","美國","澳洲","2-0"],["2026-06-19","C","摩洛哥","蘇格蘭","1-0"],
+["2026-06-19","C","巴西","海地","3-0"],["2026-06-19","D","巴拉圭","土耳其","1-0"],
+["2026-06-20","F","荷蘭","瑞典","5-1"],["2026-06-20","E","德國","象牙海岸","2-1"],["2026-06-20","E","厄瓜多","庫拉索","0-0"],
+["2026-06-21","F","日本","突尼西亞","4-0"],["2026-06-21","H","西班牙","沙烏地阿拉伯","4-0"],
+["2026-06-21","G","比利時","伊朗","0-0"],["2026-06-21","H","烏拉圭","維德角","2-2"],["2026-06-21","G","埃及","紐西蘭","3-1"],
+["2026-06-22","J","阿根廷","奧地利","2-0"],["2026-06-22","I","法國","伊拉克","3-0"],
+["2026-06-22","I","挪威","塞內加爾","3-2"],["2026-06-22","J","約旦","阿爾及利亞","1-2"],
+["2026-06-23","K","葡萄牙","烏茲別克",null],["2026-06-23","L","英格蘭","迦納",null],
+["2026-06-23","L","巴拿馬","克羅埃西亞",null],["2026-06-23","K","哥倫比亞","剛果民主共和國",null],
+["2026-06-24","B","瑞士","加拿大",null],["2026-06-24","B","波赫","卡達",null],
+["2026-06-24","C","蘇格蘭","巴西",null],["2026-06-24","C","摩洛哥","海地",null],
+["2026-06-24","A","南非","南韓",null],["2026-06-24","A","捷克","墨西哥",null],
+["2026-06-25","E","庫拉索","象牙海岸",null],["2026-06-25","E","厄瓜多","德國",null],
+["2026-06-25","F","日本","瑞典",null],["2026-06-25","F","突尼西亞","荷蘭",null],
+["2026-06-25","D","巴拉圭","澳洲",null],["2026-06-25","D","土耳其","美國",null],
+["2026-06-26","I","挪威","法國",null],["2026-06-26","I","塞內加爾","伊拉克",null],
+["2026-06-26","H","烏拉圭","西班牙",null],["2026-06-26","H","維德角","沙烏地阿拉伯",null],
+["2026-06-26","G","埃及","伊朗",null],["2026-06-26","G","紐西蘭","比利時",null],
+["2026-06-27","L","巴拿馬","英格蘭",null],["2026-06-27","L","克羅埃西亞","迦納",null],
+["2026-06-27","K","哥倫比亞","葡萄牙",null],["2026-06-27","K","剛果民主共和國","烏茲別克",null],
+["2026-06-27","J","約旦","阿根廷",null],["2026-06-27","J","阿爾及利亞","奧地利",null]
+];
+const KO_DATES=["2026-06-28","2026-06-29","2026-06-30","2026-07-01","2026-07-02","2026-07-03","2026-07-04","2026-07-05","2026-07-06","2026-07-07","2026-07-09","2026-07-10","2026-07-11","2026-07-14","2026-07-15","2026-07-18","2026-07-19"];
+const BET_TYPES=["綜合分析 (全部)","全場勝負 (1X2)","讓分盤 (Asian Handicap)","大小球 (Over/Under 2.5)","正確比數 (Correct Score)","兩隊都進球 (BTTS)","半場/全場 (HT/FT)","總進球數"];
+
+let selectedMatch=null;
+
+// Init
+(function(){
+  let dates=[...new Set(MATCHES.map(m=>m[0]))];
+  KO_DATES.forEach(d=>{if(!dates.includes(d))dates.push(d)});
+  dates.sort();
+  document.getElementById('dateSelect').innerHTML=dates.map(d=>`<option value="${d}">${d}</option>`).join('');
+  document.getElementById('betType').innerHTML=BET_TYPES.map(t=>`<option value="${t}">${t}</option>`).join('');
+  document.getElementById('simOpts').innerHTML=[50,100,200,500].map(v=>`<input type="radio" name="sims" id="s${v}" value="${v}" ${v===200?'checked':''}><label for="s${v}">${v}次</label>`).join('');
+  loadMatches();
+})();
+
+function loadMatches(){
+  let date=document.getElementById('dateSelect').value,today=new Date().toISOString().slice(0,10);
+  let matches=MATCHES.filter(m=>m[0]===date);
+  let html='';
+  matches.forEach(m=>{
+    let done=m[4]!==null,isToday=m[0]===today;
+    let cls='match-btn'+(done?' done':'')+(isToday?' today':'');
+    let txt=done?`[${m[1]}組] ${m[2]} ${m[4]} ${m[3]} (已賽)`:`[${m[1]}組] ${m[2]} vs ${m[3]}${isToday?' 🔴TODAY':''}`;
+    html+=`<button class="${cls}" onclick="selectMatch('${m[2]}','${m[3]}',this)">${txt}</button>`;
+  });
+  if(!html)html='<p style="color:#64748B;font-size:12px;padding:10px">本日尚無比賽</p>';
+  document.getElementById('matchList').innerHTML=html;
+  if(matches.length) selectMatch(matches[0][2],matches[0][3]);
+}
+
+function selectMatch(a,b,btn){
+  selectedMatch=[a,b];
+  document.querySelectorAll('.match-btn').forEach(b=>b.classList.remove('sel'));
+  if(btn)btn.classList.add('sel');
+}
+
+// ===== 模擬引擎 =====
+function poissonLambda(team,opp){
+  let t=TEAMS[team]||{a:70,d:70,m:70,e:1800,f:0},o=TEAMS[opp]||{a:70,d:70,m:70,e:1800,f:0};
+  let atk=t.a/100,def=Math.max(o.d/100,0.6),elo=(t.e-o.e)/400;
+  let form=(t.f||0)*0.06,oppForm=(o.f||0)*0.04;
+  let base=1.4;
+  return Math.max(0.25,Math.min(3.8,base*atk/def+elo*0.35+form-oppForm));
+}
+function simGoals(lam){let L=Math.exp(-lam),k=0,p=1;while(p>L){k++;p*=Math.random()}return k-1;}
+
+function simulate(a,b,n){
+  let aw=0,dw=0,bw=0,scores=[],htScores=[];
+  let reds=0,pens=0;
+  for(let i=0;i<n;i++){
+    let la=poissonLambda(a,b),lb=poissonLambda(b,a);
+    if(Math.random()<0.06){la*=0.7;reds++}
+    if(Math.random()<0.06){lb*=0.7;reds++}
+    let pa=Math.random()<0.10?1:0,pb=Math.random()<0.10?1:0;
+    if(pa+pb>0)pens++;
+    let ga=simGoals(la)+pa,gb=simGoals(lb)+pb;
+    scores.push([ga,gb]);
+    if(ga>gb)aw++;else if(ga===gb)dw++;else bw++;
+    let ha=simGoals(la*0.45),hb=simGoals(lb*0.40);
+    htScores.push([ha,hb]);
+  }
+  let total=n;
+  // Score counts
+  let scCount={};scores.forEach(s=>{let k=s[0]+':'+s[1];scCount[k]=(scCount[k]||0)+1});
+  let topScores=Object.entries(scCount).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([s,c])=>[s,(c/total*100).toFixed(1)]);
+  // Over/Under
+  let over25=scores.filter(s=>s[0]+s[1]>2.5).length/total*100;
+  let over15=scores.filter(s=>s[0]+s[1]>1.5).length/total*100;
+  let over35=scores.filter(s=>s[0]+s[1]>3.5).length/total*100;
+  // BTTS
+  let btts=scores.filter(s=>s[0]>0&&s[1]>0).length/total*100;
+  // HT/FT
+  let htft={};htScores.forEach((h,i)=>{let f=scores[i];let hk=(h[0]>h[1]?'H':h[0]===h[1]?'D':'A')+'/'+(f[0]>f[1]?'H':f[0]===f[1]?'D':'A');htft[hk]=(htft[hk]||0)+1});
+  let topHtFt=Object.entries(htft).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([k,v])=>[k,(v/total*100).toFixed(1)]);
+  // Handicaps
+  let handicaps={};
+  [-1.5,-1.0,-0.5,0.5,1.0,1.5].forEach(h=>{
+    let cover=scores.filter(s=>s[0]-s[1]>h).length/total*100;
+    handicaps[`讓${h>0?'+':''}${h}球`]=cover.toFixed(1);
+  });
+  // Total goals
+  let goals=scores.map(s=>s[0]+s[1]);
+  let avgGoals=(goals.reduce((a,b)=>a+b,0)/total).toFixed(2);
+  // Recommendations
+  let recs=[];
+  if(aw/total*100>55)recs.push(`【高信心】${a} 勝 (${(aw/total*100).toFixed(0)}%)`);
+  if(bw/total*100>55)recs.push(`【高信心】${b} 勝 (${(bw/total*100).toFixed(0)}%)`);
+  if(over25>60)recs.push(`【高信心】大 2.5 球 (${over25.toFixed(0)}%)`);
+  if(100-over25>60)recs.push(`【高信心】小 2.5 球 (${(100-over25).toFixed(0)}%)`);
+  if(btts>60)recs.push(`【高信心】兩隊都進球-是 (${btts.toFixed(0)}%)`);
+
+  return {
+    a,b,n,sa:((TEAMS[a]||{}).a*0.35+(TEAMS[a]||{}).d*0.30+(TEAMS[a]||{}).m*0.35).toFixed(1),
+    sb:((TEAMS[b]||{}).a*0.35+(TEAMS[b]||{}).d*0.30+(TEAMS[b]||{}).m*0.35).toFixed(1),
+    fa:(TEAMS[a]||{}).f||0,fb:(TEAMS[b]||{}).f||0,
+    wp:{a:(aw/total*100).toFixed(1),draw:(dw/total*100).toFixed(1),b:(bw/total*100).toFixed(1)},
+    ou:{over15:over15.toFixed(1),over25:over25.toFixed(1),over35:over35.toFixed(1),under25:(100-over25).toFixed(1)},
+    btts:{yes:btts.toFixed(1),no:(100-btts).toFixed(1)},
+    topScores,topHtFt,handicaps,avgGoals,recs,
+    reds:(reds/total).toFixed(2),pens:(pens/total).toFixed(2)
+  };
+}
+
+function runSim(){
+  if(!selectedMatch)return alert('請先選擇對戰組合');
+  let sims=parseInt(document.querySelector('input[name="sims"]:checked').value);
+  let bet=document.getElementById('betType').value;
+  let [a,b]=selectedMatch;
+  document.getElementById('result').innerHTML='<div style="text-align:center;padding:60px"><div style="font-size:36px">⏳</div><p>模擬分析中...</p></div>';
+  setTimeout(()=>{
+    let r=simulate(a,b,sims);
+    showResult(r,bet);
+  },50);
+}
+
+function showResult(r,bt){
+  let html=`<h2 style="margin-bottom:4px">${r.a} vs ${r.b} <span style="font-size:12px;color:#94A3B8">(${r.n}次模擬)</span></h2>
+  <p style="font-size:11px;color:#94A3B8;margin-bottom:12px">戰力 ${r.a}:${r.sa}(狀態${r.fa>0?'+':''}${r.fa}) | ${r.b}:${r.sb}(狀態${r.fb>0?'+':''}${r.fb}) | 紅牌率:${r.reds}/場 點球率:${r.pens}/場</p>
+  <div class="section"><h4>📊 勝率預測</h4>`;
+  [{l:r.a,p:r.wp.a,c:'#10B981'},{l:'平局',p:r.wp.draw,c:'#F59E0B'},{l:r.b,p:r.wp.b,c:'#EF4444'}].forEach(x=>{
+    html+=`<div class="bar-row"><span>${x.l}</span><div class="bar"><div style="width:${x.p}%;background:${x.c}"></div></div><span class="pct" style="color:${x.c}">${x.p}%</span></div>`;
+  });
+  html+=`</div>`;
+
+  if(bt.includes('綜合')||bt.includes('勝負'))
+    html+=`<div class="section"><h4>⚽ 全場勝負</h4><p>${r.a} 勝: ${r.wp.a}%  平局: ${r.wp.draw}%  ${r.b} 勝: ${r.wp.b}%</p></div>`;
+  if(bt.includes('綜合')||bt.includes('讓分'))
+    html+=`<div class="section"><h4>📐 讓分盤</h4><p>${Object.entries(r.handicaps).map(([k,v])=>`${r.a} ${k}: 過盤率 ${v}%`).join('\n')}</p></div>`;
+  if(bt.includes('綜合')||bt.includes('大小'))
+    html+=`<div class="section"><h4>📏 大小球</h4><p>大1.5: ${r.ou.over15}% | 大2.5: ${r.ou.over25}% | 小2.5: ${r.ou.under25}% | 大3.5: ${r.ou.over35}%\n平均總進球: ${r.avgGoals} 球</p></div>`;
+  if(bt.includes('綜合')||bt.includes('正確比數'))
+    html+=`<div class="section"><h4>🎯 正確比數 TOP5</h4><p>${r.topScores.map(s=>`${s[0]} (${s[1]}%)`).join(' | ')}</p></div>`;
+  if(bt.includes('綜合')||bt.includes('BTTS'))
+    html+=`<div class="section"><h4>⚡ BTTS</h4><p>是: ${r.btts.yes}% | 否: ${r.btts.no}%</p></div>`;
+  if(bt.includes('綜合')||bt.includes('半場'))
+    html+=`<div class="section"><h4>⏱️ 半全場 TOP5</h4><p>${r.topHtFt.map(s=>`${s[0]}: ${s[1]}%`).join(' | ')}</p></div>`;
+  if(r.recs.length)
+    html+=`<div class="section rec"><h4>💡 運彩推薦</h4><p>${r.recs.join('\n')}</p></div>`;
+
+  document.getElementById('result').innerHTML=html;
+}
+</script>
+</body>
+</html>
