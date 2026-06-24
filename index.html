@@ -192,7 +192,7 @@ function simulate(a,b,n){
   let total=n;
   // Score counts
   let scCount={};scores.forEach(s=>{let k=s[0]+':'+s[1];scCount[k]=(scCount[k]||0)+1});
-  let topScores=Object.entries(scCount).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([s,c])=>[s,(c/total*100).toFixed(1)]);
+  let topScores=Object.entries(scCount).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([s,c])=>[s,(c/total*100).toFixed(1)]);
   // Over/Under
   let over25=scores.filter(s=>s[0]+s[1]>2.5).length/total*100;
   let over15=scores.filter(s=>s[0]+s[1]>1.5).length/total*100;
@@ -259,7 +259,7 @@ function showResult(r,bt){
   if(bt.includes('綜合')||bt.includes('大小'))
     html+=`<div class="section"><h4>📏 大小球</h4><p>大1.5: ${r.ou.over15}% | 大2.5: ${r.ou.over25}% | 小2.5: ${r.ou.under25}% | 大3.5: ${r.ou.over35}%\n平均總進球: ${r.avgGoals} 球</p></div>`;
   if(bt.includes('綜合')||bt.includes('正確比數'))
-    html+=`<div class="section"><h4>🎯 正確比數 TOP5</h4><p>${r.topScores.map(s=>`${s[0]} (${s[1]}%)`).join(' | ')}</p></div>`;
+    html+=`<div class="section"><h4>🎯 正確比數 TOP3</h4><p>${r.topScores.map(s=>`${s[0]} (${s[1]}%)`).join(' | ')}</p></div>`;
   if(bt.includes('綜合')||bt.includes('BTTS'))
     html+=`<div class="section"><h4>⚡ BTTS</h4><p>是: ${r.btts.yes}% | 否: ${r.btts.no}%</p></div>`;
   if(bt.includes('綜合')||bt.includes('半場'))
