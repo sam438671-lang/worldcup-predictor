@@ -136,10 +136,11 @@ function selectMatch(a,b,btn){
 // ===== 模擬引擎 =====
 function poissonLambda(team,opp){
   let t=TEAMS[team]||{a:70,d:70,m:70,e:1800,f:0},o=TEAMS[opp]||{a:70,d:70,m:70,e:1800,f:0};
-  let atk=t.a/100,def=Math.max(o.d/100,0.6),elo=(t.e-o.e)/400;
-  let form=(t.f||0)*0.06,oppForm=(o.f||0)*0.04;
-  let base=1.4;
-  return Math.max(0.25,Math.min(3.8,base*atk/def+elo*0.35+form-oppForm));
+  let atk=t.a/100,def=Math.max(o.d/100,0.55),elo=(t.e-o.e)/400;
+  let form=(t.f||0)*0.08,oppForm=(o.f||0)*0.05;
+  let star=(t.f||0)*0.10,oppStar=(o.f||0)*0.05;
+  let base=1.51;
+  return Math.max(0.20,Math.min(4.2,base*(atk/def)+elo*0.60+form-oppForm+star-oppStar));
 }
 function simGoals(lam){let L=Math.exp(-lam),k=0,p=1;while(p>L){k++;p*=Math.random()}return k-1;}
 

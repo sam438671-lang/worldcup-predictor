@@ -32,30 +32,30 @@ def _poisson_lambda(team_name, opponent_name, is_home=True):
     t = TEAMS.get(team_name, {"att":70,"def":70,"mid":70,"elo":1800})
     o = TEAMS.get(opponent_name, {"att":70,"def":70,"mid":70,"elo":1800})
 
-    # 1️⃣ 球隊基本實力
+    # 1️⃣ 球隊基本實力 (攻防比 + Elo差異)
     attack_power = t.get("att", 70) / 100.0
-    opp_defense = o.get("def", 70) / 100.0
+    opp_defense = max(o.get("def", 70) / 100.0, 0.55)
     elo_diff = (t.get("elo", 1800) - o.get("elo", 1800)) / 400.0
 
-    # 2️⃣ 近期狀態 (近5場)
-    form = _team_form_boost(team_name) * 0.06
-    opp_form = _team_form_boost(opponent_name) * 0.04
+    # 2️⃣ 近期狀態
+    form = _team_form_boost(team_name) * 0.08
+    opp_form = _team_form_boost(opponent_name) * 0.05
 
     # 3️⃣ 球員全隊狀態
-    star = get_team_form_boost(team_name) * 0.08
-    opp_star = get_team_form_boost(opponent_name) * 0.04
+    star = get_team_form_boost(team_name) * 0.10
+    opp_star = get_team_form_boost(opponent_name) * 0.05
 
     # 4️⃣ 主場優勢
-    home_boost = 0.15 if is_home else 0.0
+    home_boost = 0.18 if is_home else 0.0
 
-    # 5️⃣ 基礎 λ
-    base = 1.4
+    # 5️⃣ 基礎 λ (匹配實際平均 3.02 球/場)
+    base = 1.51
 
-    # 綜合計算
-    lam = (base * attack_power / max(opp_defense, 0.6) + elo_diff * 0.35 +
+    # 綜合計算 (Elo 權重提升到 0.6)
+    lam = (base * (attack_power / opp_defense) + elo_diff * 0.60 +
            form - opp_form + star - opp_star + home_boost)
 
-    return max(0.25, min(3.8, lam))
+    return max(0.20, min(4.2, lam))
 
 def _simulate_goals(lam):
     """Poisson 分布隨機生成進球數"""
